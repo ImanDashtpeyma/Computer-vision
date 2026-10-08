@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# MediaPipe downloads its own model bundle; don't commit it
+*.task
+
+# Never commit participant data or study results from the thesis -- this
+# repo stays a generic, publishable pose-detection API, not thesis data.
+data/
+study_results/
+*.csv
+*.json.bak
+
+.DS_Store
+.vscode/
+*.swp

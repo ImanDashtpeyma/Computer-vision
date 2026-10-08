@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Downloaded model weights (fetched by scripts/download_model.py, not committed)
+models/*.caffemodel
+models/*.prototxt
+models/*.onnx
+models/*.nb
+models/*.nbg
+
+# OS / editor
+.DS_Store
+.vscode/
+*.swp
+
+# Captured frames / local test output
+output/
+*.mp4
+*.avi
+*.jpg
+*.png
+!assets/*.png
+!assets/*.jpg
