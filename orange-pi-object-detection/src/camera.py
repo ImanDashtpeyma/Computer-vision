@@ -29,15 +29,21 @@ class Camera:
     def open(self) -> None:
         import cv2  # imported lazily so importing this module never requires
 
-        self._cap = cv2.VideoCapture(self.config.device)
+        if self.config.use_v4l2:
+            self._cap = cv2.VideoCapture(self.config.device, cv2.CAP_V4L2)
+        else:
+            self._cap = cv2.VideoCapture(self.config.device)
+        if self.config.fourcc:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*self.config.fourcc))
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.capture_width)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.capture_height)
         if not self._cap.isOpened():
             raise RuntimeError(
                 f"Could not open camera device {self.config.device!r}. "
-                "On the Orange Pi, check that the OV13850 MIPI camera is "
-                "enabled in the device tree overlay and that /dev/video* "
-                "exists (`v4l2-ctl --list-devices`)."
+                "On the Orange Pi, load the camera driver first "
+                "(`sudo modprobe vin_v4l2`), then check which /dev/video* node is the "
+                "OV13850 (`ls /dev/video*`; the manual lists /dev/video0 and /dev/video8). "
+                "`python scripts/check_camera.py` tries the common options for you."
             )
 
     def close(self) -> None:

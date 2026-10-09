@@ -2,43 +2,30 @@
 
 The pipeline is split from the inference engine on purpose: `Detection`
 objects are a plain, backend-agnostic format, and swapping how they get
-produced (CPU today, NPU later) should never touch camera.py or main.py.
+produced (CPU or NPU) never touches camera.py or main.py.
 
-Backend status, honestly:
+* OpenCVDNNBackend ("cpu"): MobileNet-SSD through OpenCV's DNN module. Works
+  on any machine with OpenCV and is what CI exercises.
 
-* OpenCVDNNBackend ("cpu") is fully implemented, works on any machine with
-  OpenCV, and is what this repo actually runs and tests in CI.
-
-* NPUBackend ("npu") is a documented stub, not a working implementation.
-  The Allwinner A733's VeriSilicon VIP9000 NPU *does* work on this specific
-  board -- I've run it successfully through Allwinner/Orange Pi's official
-  demo tooling -- but as of writing there is no mainstream, scriptable path
-  into it: ONNX Runtime only exposes CPU on this SoC (a VIPLite execution
-  provider is an open proposal, not shipped code -- see
-  https://github.com/microsoft/onnxruntime/issues/28244), and the real
-  route is Allwinner's ACUITY Toolkit converting a model to its NBG format
-  and calling it through the low-level `libVIPhal.so` (VIPLite) API
-  directly. That toolchain is vendor-specific, tied to whatever SDK/image
-  shipped with the board, and not something that can be wired up and
-  verified from outside the device. Rather than fake that integration,
-  this class documents the real steps and raises clearly until someone
-  (me, with the board in front of me) fills it in.
+* NPUBackend ("npu"): YOLOv5s on the Allwinner A733's NPU, through the vendor
+  `awnn` helper library (built from Allwinner's ai-sdk by
+  native/build_awnn.sh) and a prebuilt `.nb` network binary. Only the network
+  runs on the NPU; letterbox pre-processing and box decoding/NMS are numpy
+  (src/yolov5.py). This path needs the real board, the vendor driver and the
+  `.nb` file, so it is not exercised in CI -- its maths is unit-tested with
+  synthetic tensors, and the hardware path is checked by hand on the board.
 """
 from __future__ import annotations
 
+import pathlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 import numpy as np
 
+from .backends_types import Detection
 from .config import ModelConfig
 
-
-@dataclass
-class Detection:
-    label: str
-    confidence: float
-    box: tuple[int, int, int, int]  # (x1, y1, x2, y2) in pixel coordinates
+__all__ = ["Detection", "InferenceBackend", "OpenCVDNNBackend", "NPUBackend", "build_backend"]
 
 
 class InferenceBackend(ABC):
@@ -93,29 +80,58 @@ class OpenCVDNNBackend(InferenceBackend):
 
 
 class NPUBackend(InferenceBackend):
-    """Documented stub for Allwinner A733 NPU (VIP9000) inference.
+    """YOLOv5s on the Allwinner A733 NPU (VIP9000, NPU v3) via the awnn library.
 
-    Not implemented yet -- see the module docstring above for exactly why,
-    and the README's "NPU status" section for the steps this would need:
-    1. Convert the model to Allwinner's NBG format with the ACUITY Toolkit.
-    2. Load/run it through libVIPhal.so (the VIPLite API) instead of
-       OpenCV/ONNX Runtime.
-    3. Wrap that in this class so `detect()` returns the same `Detection`
-       objects the CPU backend returns -- the rest of the app doesn't change.
+    Everything hardware-related is loaded lazily on the first `detect()` call,
+    so constructing this class (e.g. in tests, or on a machine without the
+    NPU) never touches the driver. A fake `lib` can be injected for testing.
     """
 
-    def __init__(self, config: ModelConfig):
+    # yolov5s outputs: 3 anchors x grid x grid x 85 floats for strides 8/16/32
+    OUTPUT_SIZES = [3 * g * g * 85 for g in (80, 40, 20)]
+
+    def __init__(self, config: ModelConfig, lib=None):
         self.config = config
+        self._lib = lib
+        self._ctx = None
+
+    def _ensure_ready(self) -> None:
+        if self._ctx is not None:
+            return
+        nbg = pathlib.Path(self.config.nbg_path)
+        if not nbg.exists():
+            raise FileNotFoundError(
+                f"NPU network binary not found at {nbg}. Copy yolov5.nb (the v3 build) from "
+                "Allwinner's ai-sdk examples/yolov5/model/v3/ -- see README, 'NPU backend'."
+            )
+        if self._lib is None:
+            from .awnn import AwnnLibrary
+
+            self._lib = AwnnLibrary(self.config.awnn_lib_path)
+        self._lib.init()
+        self._ctx = self._lib.create(str(nbg))
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
-        raise NotImplementedError(
-            "NPU backend is not wired up in this repo yet. The A733's "
-            "VIP9000 NPU works on this board via Allwinner/Orange Pi's own "
-            "demo tooling, but integrating it here needs the vendor ACUITY "
-            "Toolkit (model -> NBG) and the libVIPhal.so API, which is "
-            "board/image-specific and documented in the README instead of "
-            "faked here. Use backend='cpu' for a working, portable path."
+        from .yolov5 import decode_outputs, letterbox_preprocess
+
+        self._ensure_ready()
+        size = self.config.npu_input_size
+        chw, info = letterbox_preprocess(frame, size)
+        outputs = self._lib.run(self._ctx, chw, self.OUTPUT_SIZES)
+        return decode_outputs(
+            outputs,
+            info,
+            self.config.npu_classes,
+            size=size,
+            conf_threshold=self.config.confidence_threshold,
+            nms_threshold=self.config.npu_nms_threshold,
         )
+
+    def close(self) -> None:
+        if self._ctx is not None:
+            self._lib.destroy(self._ctx)
+            self._lib.uninit()
+            self._ctx = None
 
 
 def build_backend(config: ModelConfig) -> InferenceBackend:

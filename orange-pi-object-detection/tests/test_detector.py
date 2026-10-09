@@ -52,19 +52,13 @@ def test_annotate_with_no_detections_returns_unchanged_image():
     assert np.array_equal(annotated, frame)
 
 
-def test_npu_backend_is_an_honest_stub_not_a_fake_implementation():
-    backend = NPUBackend(ModelConfig(backend="npu"))
-    with pytest.raises(NotImplementedError):
-        backend.detect(make_frame())
-
-
 def test_build_backend_rejects_unknown_backend_name():
     with pytest.raises(ValueError):
         build_backend(ModelConfig(backend="quantum"))
 
 
-def test_build_backend_returns_npu_backend_without_loading_weights():
-    # Constructing the NPU backend must not try to touch model files --
-    # only calling detect() should raise.
+def test_build_backend_returns_npu_backend_without_touching_hardware():
+    # Constructing the NPU backend must not load the driver, library or .nb
+    # file -- only the first detect() call does.
     backend = build_backend(ModelConfig(backend="npu"))
     assert isinstance(backend, NPUBackend)

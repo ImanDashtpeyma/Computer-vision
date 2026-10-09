@@ -17,6 +17,22 @@ VOC_CLASSES = [
     "tvmonitor",
 ]
 
+# The 80 COCO labels the YOLOv5s .nb model from Allwinner's ai-sdk was trained
+# on. Order matches the class index the network outputs.
+COCO_CLASSES = [
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat",
+    "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
+    "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack",
+    "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball",
+    "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket",
+    "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+    "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+    "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
+    "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+    "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
+    "toothbrush",
+]
+
 
 @dataclass
 class CameraConfig:
@@ -26,6 +42,12 @@ class CameraConfig:
     device: str | int = 0
     capture_width: int = 1280
     capture_height: int = 720
+    # Force the V4L2 backend and (optionally) a pixel format such as "MJPG" or
+    # "YUYV". The Orange Pi's MIPI camera goes through the sunxi vin_v4l2
+    # driver, so which of these works has to be checked on the board -- see
+    # scripts/check_camera.py.
+    use_v4l2: bool = True
+    fourcc: str | None = None
     # The 13MP sensor can go much higher; we deliberately capture at a
     # lower resolution because the model and the CPU, not the sensor, are
     # the bottleneck for real-time detection.
@@ -39,6 +61,13 @@ class ModelConfig:
     input_size: int = 300  # MobileNet-SSD expects 300x300 input
     confidence_threshold: float = 0.5
     classes: list[str] = field(default_factory=lambda: list(VOC_CLASSES))
+
+    # --- NPU backend (Allwinner A733 / VIPLite), only used when backend == "npu" ---
+    nbg_path: str = "models/yolov5.nb"  # network binary (.nb) for NPU v3
+    awnn_lib_path: str = "native/libawnn_npu.so"  # built by native/build_awnn.sh
+    npu_input_size: int = 640  # the yolov5 .nb takes a fixed 640x640 letterboxed RGB image
+    npu_nms_threshold: float = 0.45
+    npu_classes: list[str] = field(default_factory=lambda: list(COCO_CLASSES))
 
 
 @dataclass

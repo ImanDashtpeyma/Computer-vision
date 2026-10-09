@@ -19,7 +19,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default=0, help="Camera device path or index (default: 0)")
     parser.add_argument("--backend", default="cpu", choices=["cpu", "npu"])
-    parser.add_argument("--confidence", type=float, default=0.5)
+    parser.add_argument("--confidence", type=float, default=None,
+                        help="Confidence threshold (default: 0.5 for cpu, 0.4 for npu)")
+    parser.add_argument("--nbg", default=None, help="Path to the yolov5 .nb file (npu backend)")
+    parser.add_argument("--awnn-lib", default=None, help="Path to libawnn_npu.so (npu backend)")
+    parser.add_argument("--fourcc", default=None, help="Camera pixel format, e.g. MJPG or YUYV")
     parser.add_argument("--no-window", action="store_true", help="Don't open a display window")
     parser.add_argument("--save", default=None, help="Optional path to save annotated output video")
     return parser.parse_args()
@@ -30,7 +34,14 @@ def main() -> int:
     config = AppConfig()
     config.camera.device = args.device
     config.model.backend = args.backend
-    config.model.confidence_threshold = args.confidence
+    config.model.confidence_threshold = (
+        args.confidence if args.confidence is not None else (0.4 if args.backend == "npu" else 0.5)
+    )
+    if args.nbg:
+        config.model.nbg_path = args.nbg
+    if args.awnn_lib:
+        config.model.awnn_lib_path = args.awnn_lib
+    config.camera.fourcc = args.fourcc
     config.show_window = not args.no_window
     config.save_output_path = args.save
 

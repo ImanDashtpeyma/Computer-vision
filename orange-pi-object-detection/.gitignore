@@ -27,3 +27,6 @@ output/
 *.png
 !assets/*.png
 !assets/*.jpg
+
+# Built on the board from the vendor SDK
+native/*.so
