@@ -30,6 +30,10 @@ def make_png_bytes(width: int = 32, height: int = 32) -> bytes:
     return encoded.tobytes()
 
 
+def png_upload() -> dict:
+    return {"file": ("frame.png", make_png_bytes(), "image/png")}
+
+
 def override_with(result: PoseResult) -> TestClient:
     app.dependency_overrides[get_pose_estimator] = lambda: FakePoseEstimator(result)
     return TestClient(app)
@@ -48,7 +52,7 @@ def test_detect_pose_returns_landmarks():
     )
     client = override_with(pose_detected_result)
 
-    response = client.post("/pose/detect", files={"file": ("frame.png", make_png_bytes(), "image/png")})
+    response = client.post("/pose/detect", files=png_upload())
 
     assert response.status_code == 200
     body = response.json()
@@ -60,7 +64,7 @@ def test_detect_pose_returns_landmarks():
 def test_detect_pose_with_no_pose_found():
     client = override_with(PoseResult(pose_detected=False, landmarks=[]))
 
-    response = client.post("/pose/detect", files={"file": ("frame.png", make_png_bytes(), "image/png")})
+    response = client.post("/pose/detect", files=png_upload())
 
     assert response.status_code == 200
     assert response.json() == {"pose_detected": False, "landmarks": []}
@@ -83,7 +87,7 @@ def test_annotate_pose_returns_png_with_skeleton():
     )
     client = override_with(pose_detected_result)
 
-    response = client.post("/pose/annotate", files={"file": ("frame.png", make_png_bytes(), "image/png")})
+    response = client.post("/pose/annotate", files=png_upload())
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
@@ -93,7 +97,7 @@ def test_annotate_pose_returns_png_with_skeleton():
 def test_annotate_pose_without_detection_returns_original_sized_image():
     client = override_with(PoseResult(pose_detected=False, landmarks=[]))
 
-    response = client.post("/pose/annotate", files={"file": ("frame.png", make_png_bytes(), "image/png")})
+    response = client.post("/pose/annotate", files=png_upload())
 
     assert response.status_code == 200
     decoded = cv2.imdecode(np.frombuffer(response.content, dtype=np.uint8), cv2.IMREAD_COLOR)
