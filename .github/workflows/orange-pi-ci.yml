@@ -1,10 +1,20 @@
-name: CI
+name: Orange Pi object detection CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - "orange-pi-object-detection/**"
+      - ".github/workflows/orange-pi-ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "orange-pi-object-detection/**"
+      - ".github/workflows/orange-pi-ci.yml"
+
+defaults:
+  run:
+    working-directory: orange-pi-object-detection
 
 jobs:
   lint-and-test:
@@ -16,6 +26,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: orange-pi-object-detection/requirements*.txt
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
@@ -33,4 +44,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image
-        run: docker build -t fastapi-pose-detection:ci .
+        run: docker build -t orange-pi-object-detection:ci .
