@@ -1,0 +1,33 @@
+// Jenkins pipeline for fastapi-pose-detection. In a Multibranch Pipeline job set
+// "Script Path" to fastapi-pose-detection/Jenkinsfile (see jenkins/README.md).
+pipeline {
+  agent any
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  stages {
+    stage('Lint and test') {
+      agent { docker { image 'python:3.11' } }
+      steps {
+        dir('fastapi-pose-detection') {
+          sh '''
+            python -m venv .venv
+            . .venv/bin/activate
+            pip install --quiet -r requirements-dev.txt
+            ruff check .
+            pytest -q
+          '''
+        }
+      }
+    }
+
+    stage('Docker build') {
+      steps {
+        sh 'docker build -t fastapi-pose-detection:jenkins-${BUILD_NUMBER} fastapi-pose-detection'
+      }
+    }
+  }
+}

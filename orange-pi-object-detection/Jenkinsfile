@@ -1,0 +1,33 @@
+// Jenkins pipeline for orange-pi-object-detection. In a Multibranch Pipeline job set
+// "Script Path" to orange-pi-object-detection/Jenkinsfile (see jenkins/README.md).
+pipeline {
+  agent any
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  stages {
+    stage('Lint and test') {
+      agent { docker { image 'python:3.11' } }
+      steps {
+        dir('orange-pi-object-detection') {
+          sh '''
+            python -m venv .venv
+            . .venv/bin/activate
+            pip install --quiet -r requirements-dev.txt
+            ruff check .
+            pytest -q
+          '''
+        }
+      }
+    }
+
+    stage('Docker build') {
+      steps {
+        sh 'docker build -t orange-pi-object-detection:jenkins-${BUILD_NUMBER} orange-pi-object-detection'
+      }
+    }
+  }
+}

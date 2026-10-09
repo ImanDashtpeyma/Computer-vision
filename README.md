@@ -43,10 +43,15 @@ I'd rather be upfront about what has and hasn't been checked:
 ├── orange-pi-object-detection/   # detection pipeline, CPU + NPU backends, native build script
 ├── fastapi-pose-detection/       # pose-detection API
 ├── Documents-Tools-Samples/      # board manuals and reference material (see below)
-└── .github/workflows/            # one CI workflow per project (lint, tests, Docker build)
+├── .github/workflows/            # one GitHub Actions workflow per project (lint, tests, Docker build)
+└── jenkins/                      # local Jenkins setup; each project also has a Jenkinsfile
 ```
 
 `Documents-Tools-Samples/` holds vendor documentation I use as a reference. The vendor SDKs I build against are not redistributed from this repo: the NPU project compiles Allwinner's helper library from your own copy of their `ai-sdk`.
+
+## CI
+
+GitHub Actions is the main CI (badges above). Each project also has a `Jenkinsfile` running the same lint, test and Docker-build steps, and [`jenkins/`](jenkins) has a Docker setup for running Jenkins locally. The Jenkinsfile commands were checked outside Jenkins; I haven't recorded a full run on a live Jenkins server yet.
 
 ## Running the tests
 
