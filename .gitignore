@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vendor SDK / board docs kept locally for reference, not redistributed from this repo
+Documents-Tools-Samples/NPU Sample Program/
+Documents-Tools-Samples/wiringOP-Python/wiringOP-Python/
+
+# pytest leftovers
+pytest-cache-files-*/
